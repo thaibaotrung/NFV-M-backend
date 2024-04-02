@@ -1,0 +1,124 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+topology_template:
+  node_templates:
+    vnf_001:
+      type: tosca.nodes.nfv.VNF
+      properties:
+        vnfInstanceName: "VNF Instance 1"
+        vnfInstanceDescription: "Description of VNF Instance 1"
+        vnfdid: "vnfd-001"
+        vnfProvider: "ACME Provider"
+        vnfProductName: "Product Name"
+        vnfSoftwareVersion: "1.0"
+        instantiationState: "ACTIVE"
+
+    mongo_deployment:
+      type: tosca.nodes.Container.Application.Docker
+      properties:
+        vnfcInstanceId: "vnfc-123"
+        vnfcName: "vnfc-01"
+        description: "This is a VNFC instance"
+        vduid: "vdu-001"
+        vnfcState: "ACTIVE"
+        ip: "192.168.0.1"
+        name: "mongo-deployment"
+        labels:
+          app: "mongo"
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: "mongo"
+          template:
+            metadata:
+              labels:
+                app: "mongo"
+            spec:
+              containers:
+                - name: "mongo"
+                  image: "mongo:5.0"
+                  ports:
+                    - containerPort: 27017
+                  env:
+                    - name: "MONGO_INITDB_ROOT_USERNAME"
+                      valueFrom:
+                        secretKeyRef:
+                          name: "mongo-secret"
+                          key: "mongo-user"
+                    - name: "MONGO_INITDB_ROOT_PASSWORD"
+                      valueFrom:
+                        secretKeyRef:
+                          name: "mongo-secret"
+                          key: "mongo-password"
+
+    mongo_service:
+      type: tosca.nodes.network.Service
+      properties:
+
+        name: "mongo-service"
+        spec:
+          selector:
+            app: "mongo"
+          ports:
+            - protocol: "TCP"
+              port: 27017
+              targetPort: 27017
+
+    webapp_deployment:
+      type: tosca.nodes.Container.Application.Docker
+      properties:
+        vnfcInstanceId: "vnfc-1234"
+        vnfcName: "vnfc-02"
+        description: "This is a VNFC instance"
+        vduid: "vdu-001"
+        vnfcState: "ACTIVE"
+        ip: "192.168.0.1"
+        name: "webapp-deployment"
+        labels:
+          app: "webapp"
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: "webapp"
+          template:
+            metadata:
+              labels:
+                app: "webapp"
+            spec:
+              containers:
+                - name: "webapp"
+                  image: "mongo-express:latest"
+                  ports:
+                    - containerPort: 8081
+                  env:
+                    - name: "ME_CONFIG_MONGODB_SERVER"
+                      valueFrom:
+                        configMapKeyRef:
+                          name: "mongo-config"
+                          key: "mongo-url"
+                    - name: "ME_CONFIG_MONGODB_ADMINUSERNAME"
+                      valueFrom:
+                        secretKeyRef:
+                          name: "mongo-secret"
+                          key: "mongo-user"
+                    - name: "ME_CONFIG_MONGODB_ADMINPASSWORD"
+                      valueFrom:
+                        secretKeyRef:
+                          name: "mongo-secret"
+                          key: "mongo-password"
+
+    webapp_service:
+      type: tosca.nodes.network.Service
+      properties:
+        name: "webapp-service"
+        spec:
+          type: "NodePort"
+          selector:
+            app: "webapp"
+          ports:
+            - protocol: "TCP"
+              port: 8081
+              targetPort: 8081
+              nodePort: 30100
